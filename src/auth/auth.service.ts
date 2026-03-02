@@ -32,9 +32,11 @@ export class AuthService {
         email: registerDto.email,
         password: hashedPassword,
         name: registerDto.name,
+        role: registerDto.role || 'user',
       },
     });
 
+    // remove password from response
     const { password, ...result } = user;
     return result;
   }
