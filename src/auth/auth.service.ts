@@ -17,33 +17,43 @@ export class AuthService {
   ) {}
 
   async register(registerDto: RegisterDto) {
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email: registerDto.email },
+    const existingUser = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: registerDto.email },
+          { username: registerDto.username },
+        ],
+      },
     });
 
     if (existingUser) {
-      throw new ConflictException('Email already exists');
+      throw new ConflictException('Email or username already exists');
     }
 
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
 
     const user = await this.prisma.user.create({
       data: {
+        username: registerDto.username,
         email: registerDto.email,
-        password: hashedPassword,
         name: registerDto.name,
+        password: hashedPassword,
         role: registerDto.role || 'user',
       },
     });
 
-    // remove password from response
     const { password, ...result } = user;
     return result;
   }
 
   async login(loginDto: LoginDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { email: loginDto.email },
+    const user = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: loginDto.username },
+          { username: loginDto.username },
+        ],
+      },
     });
 
     if (!user) {
@@ -59,12 +69,18 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const payload = { sub: user.id, email: user.email, role: user.role };
+    const payload = {
+      sub: user.id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+    };
 
     return {
       access_token: this.jwtService.sign(payload),
       user: {
         id: user.id,
+        username: user.username,
         email: user.email,
         name: user.name,
         role: user.role,
